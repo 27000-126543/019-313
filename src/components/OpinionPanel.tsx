@@ -16,12 +16,70 @@ import {
   Calendar,
   ListChecks,
   AlertCircle,
+  X,
+  ArrowRight,
+  Play,
+  User,
+  CheckCircle,
+  Clock,
 } from 'lucide-react';
 import OpinionModal from './modals/OpinionModal';
 import type { Opinion, OpinionType, Event } from '../types';
 import './OpinionPanel.css';
 
-type ViewMode = 'opinions' | 'conclusions';
+type ViewMode = 'opinions' | 'conclusions' | 'tracker';
+
+type FollowUpGroup = 'today' | 'this_week' | 'later' | 'unset';
+
+interface GroupedFollowUp {
+  event: Event;
+  followUpTime: string;
+  coreJudgment?: string;
+  impactScope?: string;
+  companyName: string;
+}
+
+function parseFollowUpDate(timeStr: string): Date | null {
+  if (!timeStr) return null;
+  const cleaned = timeStr.replace(/[（(].*[)）]/g, '').trim();
+  const formats = [
+    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/,
+    /^(\d{1,2})[-/月](\d{1,2})/,
+  ];
+  for (const re of formats) {
+    const m = cleaned.match(re);
+    if (m) {
+      const now = new Date();
+      let year, month, day;
+      if (m.length === 4) {
+        year = parseInt(m[1]);
+        month = parseInt(m[2]) - 1;
+        day = parseInt(m[3]);
+      } else {
+        year = now.getFullYear();
+        month = parseInt(m[1]) - 1;
+        day = parseInt(m[2]);
+      }
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+}
+
+function groupFollowUp(event: Event, baseDate: Date): FollowUpGroup {
+  if (!event.conclusion?.followUpTime) return 'unset';
+  const d = parseFollowUpDate(event.conclusion.followUpTime);
+  if (!d) return 'unset';
+
+  const startOfToday = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+  const dayMs = 24 * 60 * 60 * 1000;
+  const diffDays = Math.floor((d.getTime() - startOfToday.getTime()) / dayMs);
+
+  if (diffDays <= 0) return 'today';
+  if (diffDays <= 7) return 'this_week';
+  return 'later';
+}
 
 export default function OpinionPanel() {
   const opinions = useStore((s) => s.opinions);
@@ -31,6 +89,8 @@ export default function OpinionPanel() {
   const selectedEventId = useStore((s) => s.selectedEventId);
   const selectedNewsId = useStore((s) => s.selectedNewsId);
   const selectedCompanyId = useStore((s) => s.selectedCompanyId);
+  const setSelectedEvent = useStore((s) => s.setSelectedEvent);
+  const setSelectedCompany = useStore((s) => s.setSelectedCompany);
   const isMorningFilter = useStore((s) => s.isMorningFilter);
   const morningFilterMode = useStore((s) => s.morningFilterMode);
   const currentDate = useStore((s) => s.currentDate);
@@ -42,6 +102,7 @@ export default function OpinionPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('opinions');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editOpinion, setEditOpinion] = useState<Opinion | null>(null);
+  const [opinionForEvent, setOpinionForEvent] = useState<Event | null>(null);
 
   const getActivePortfolio = (): string | null => {
     if (typeof morningFilterMode === 'string' && morningFilterMode.startsWith('portfolio:')) {
@@ -73,19 +134,16 @@ export default function OpinionPanel() {
     );
   }, [opinions, selectedCompanyId, filterType, isMorningFilter, activePortfolio, companies]);
 
-  const todayOpinions = useMemo(
-    () => {
-      let filtered = opinions.filter((o) => formatDate(o.createdAt) === currentDate);
-      if (isMorningFilter && activePortfolio) {
-        const portfolioCompanyIds = companies
-          .filter((c) => c.portfolio === activePortfolio)
-          .map((c) => c.id);
-        filtered = filtered.filter((o) => portfolioCompanyIds.includes(o.companyId));
-      }
-      return filtered;
-    },
-    [opinions, currentDate, isMorningFilter, activePortfolio, companies]
-  );
+  const todayOpinions = useMemo(() => {
+    let filtered = opinions.filter((o) => formatDate(o.createdAt) === currentDate);
+    if (isMorningFilter && activePortfolio) {
+      const portfolioCompanyIds = companies
+        .filter((c) => c.portfolio === activePortfolio)
+        .map((c) => c.id);
+      filtered = filtered.filter((o) => portfolioCompanyIds.includes(o.companyId));
+    }
+    return filtered;
+  }, [opinions, currentDate, isMorningFilter, activePortfolio, companies]);
 
   const todayEventsWithConclusions = useMemo(() => {
     let todayEvents = events.filter(
@@ -96,11 +154,44 @@ export default function OpinionPanel() {
         .filter((c) => c.portfolio === activePortfolio)
         .map((c) => c.id);
       todayEvents = todayEvents.filter((e) => portfolioCompanyIds.includes(e.companyId));
+    } else if (selectedCompanyId) {
+      todayEvents = todayEvents.filter((e) => e.companyId === selectedCompanyId);
     }
     return todayEvents.sort(
       (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
     );
-  }, [events, currentDate, isMorningFilter, activePortfolio, companies]);
+  }, [events, currentDate, isMorningFilter, activePortfolio, companies, selectedCompanyId]);
+
+  const groupedTracker = useMemo(() => {
+    const baseDate = new Date();
+    const groups: Record<FollowUpGroup, GroupedFollowUp[]> = {
+      today: [],
+      this_week: [],
+      later: [],
+      unset: [],
+    };
+    for (const ev of todayEventsWithConclusions) {
+      if (!ev.conclusion) continue;
+      const company = companies.find((c) => c.id === ev.companyId);
+      const item: GroupedFollowUp = {
+        event: ev,
+        followUpTime: ev.conclusion.followUpTime,
+        coreJudgment: ev.conclusion.coreJudgment,
+        impactScope: ev.conclusion.impactScope,
+        companyName: company?.name || '未知',
+      };
+      const group = groupFollowUp(ev, baseDate);
+      groups[group].push(item);
+    }
+    const sortKey = (g: GroupedFollowUp) => {
+      const d = parseFollowUpDate(g.followUpTime);
+      return d ? d.getTime() : Infinity;
+    };
+    groups.today.sort((a, b) => sortKey(a) - sortKey(b));
+    groups.this_week.sort((a, b) => sortKey(a) - sortKey(b));
+    groups.later.sort((a, b) => sortKey(a) - sortKey(b));
+    return groups;
+  }, [todayEventsWithConclusions, companies]);
 
   const getCompanyName = (companyId: string) => {
     return companies.find((c) => c.id === companyId)?.name || '未知';
@@ -152,6 +243,7 @@ export default function OpinionPanel() {
     };
     addOpinion(newOpinion);
     setShowAddModal(false);
+    setOpinionForEvent(null);
   };
 
   const handleUpdateOpinion = (data: {
@@ -168,6 +260,7 @@ export default function OpinionPanel() {
   };
 
   const getDefaultCompanyId = () => {
+    if (opinionForEvent) return opinionForEvent.companyId;
     if (selectedEventId) {
       const event = events.find((e) => e.id === selectedEventId);
       if (event) return event.companyId;
@@ -206,6 +299,26 @@ export default function OpinionPanel() {
 
     return { coreJudgments, impactScopes, followUps };
   }, [todayEventsWithConclusions]);
+
+  const jumpToEvent = (eventId: string) => {
+    const ev = events.find((e) => e.id === eventId);
+    if (ev) {
+      setSelectedCompany(ev.companyId);
+      setSelectedEvent(eventId);
+    }
+  };
+
+  const openOpinionForEvent = (ev: Event) => {
+    setOpinionForEvent(ev);
+    setShowAddModal(true);
+  };
+
+  const GROUP_LABELS: Record<FollowUpGroup, { label: string; icon: typeof Clock; color: string }> = {
+    today: { label: '今日需跟踪', icon: Play, color: '#ef4444' },
+    this_week: { label: '未来一周', icon: Calendar, color: '#f59e0b' },
+    later: { label: '一周以后', icon: Clock, color: '#6b7280' },
+    unset: { label: '未填跟踪时间', icon: AlertCircle, color: '#dc2626' },
+  };
 
   return (
     <>
@@ -258,6 +371,18 @@ export default function OpinionPanel() {
             结论汇总
             {todayEventsWithConclusions.length > 0 && (
               <span className="view-tab-badge">{todayEventsWithConclusions.length}</span>
+            )}
+          </button>
+          <button
+            className={`view-tab ${viewMode === 'tracker' ? 'active' : ''}`}
+            onClick={() => setViewMode('tracker')}
+          >
+            <Calendar size={12} />
+            跟踪工作台
+            {groupedTracker.today.length > 0 && (
+              <span className="view-tab-badge" style={{ background: '#ef4444' }}>
+                {groupedTracker.today.length}
+              </span>
             )}
           </button>
         </div>
@@ -479,6 +604,90 @@ export default function OpinionPanel() {
             )}
           </div>
         )}
+
+        {viewMode === 'tracker' && (
+          <div className="panel-content">
+            {Object.values(groupedTracker).every((g) => g.length === 0) ? (
+              <div className="empty-state">
+                <Calendar size={32} className="empty-state-icon" />
+                <div className="empty-state-text">暂无待跟踪事项</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  在事件卡片中填写后续跟踪时间后，这里会自动按时间分组
+                </div>
+              </div>
+            ) : (
+              <div className="tracker-groups">
+                {(Object.keys(GROUP_LABELS) as FollowUpGroup[]).map((group) => {
+                  const items = groupedTracker[group];
+                  if (items.length === 0) return null;
+                  const label = GROUP_LABELS[group];
+                  const Icon = label.icon;
+                  return (
+                    <div key={group} className="tracker-group">
+                      <div className="tracker-group-header" style={{ borderColor: label.color }}>
+                        <Icon size={14} style={{ color: label.color }} />
+                        <span className="tracker-group-title" style={{ color: label.color }}>
+                          {label.label}
+                        </span>
+                        <span className="tracker-group-count">{items.length}项</span>
+                      </div>
+                      <div className="tracker-group-items">
+                        {items.map((item) => (
+                          <div key={item.event.id} className="tracker-item">
+                            <div className="tracker-item-header">
+                              <div className="tracker-item-event">
+                                <AlertCircle size={11} style={{ color: '#ef4444' }} />
+                                <span className="tracker-item-company">{item.companyName}</span>
+                                <ArrowRight size={10} style={{ color: 'var(--text-muted)' }} />
+                                <span className="tracker-item-title">{item.event.title}</span>
+                              </div>
+                              <div className="tracker-item-actions">
+                                <button
+                                  className="btn btn-ghost btn-xs"
+                                  onClick={() => jumpToEvent(item.event.id)}
+                                  title="跳转到事件卡片"
+                                >
+                                  <ArrowRight size={11} />
+                                </button>
+                                <button
+                                  className="btn btn-ghost btn-xs"
+                                  onClick={() => openOpinionForEvent(item.event)}
+                                  title="记录新观点"
+                                >
+                                  <Plus size={11} />
+                                </button>
+                              </div>
+                            </div>
+                            {item.followUpTime && (
+                              <div className="tracker-item-time">
+                                <Calendar size={11} style={{ color: label.color }} />
+                                <span style={{ color: label.color, fontWeight: 500 }}>
+                                  {item.followUpTime}
+                                </span>
+                              </div>
+                            )}
+                            {item.coreJudgment && (
+                              <div className="tracker-item-judgment">
+                                <Target size={11} />
+                                <span>{item.coreJudgment}</span>
+                              </div>
+                            )}
+                            {item.impactScope && (
+                              <div className="tracker-item-impact">
+                                <Compass size={11} />
+                                <span>{item.impactScope}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </aside>
 
       {showAddModal && (
@@ -487,21 +696,15 @@ export default function OpinionPanel() {
           events={events}
           news={news}
           defaultCompanyId={getDefaultCompanyId()}
-          defaultEventId={selectedEventId || undefined}
+          defaultEventId={opinionForEvent?.id || selectedEventId || undefined}
           defaultNewsId={selectedNewsId || undefined}
-          onClose={() => setShowAddModal(false)}
-          onSubmit={handleAddOpinion}
-        />
-      )}
-
-      {editOpinion && (
-        <OpinionModal
-          companies={companies}
-          events={events}
-          news={news}
-          initialData={editOpinion}
-          onClose={() => setEditOpinion(null)}
-          onSubmit={handleUpdateOpinion}
+          initialData={editOpinion || undefined}
+          onClose={() => {
+            setShowAddModal(false);
+            setOpinionForEvent(null);
+            setEditOpinion(null);
+          }}
+          onSubmit={editOpinion ? handleUpdateOpinion : handleAddOpinion}
         />
       )}
     </>

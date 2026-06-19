@@ -79,11 +79,17 @@ export const useStore = create<StoreState>((set, get) => ({
     set({
       morningFilterMode: mode,
       isMorningFilter: mode !== 'off',
+      selectedCompanyId: null,
+      selectedEventId: null,
+      selectedNewsId: null,
     }),
   toggleMorningFilter: () =>
     set((s) => ({
       isMorningFilter: !s.isMorningFilter,
       morningFilterMode: s.isMorningFilter ? 'off' : 'all',
+      selectedCompanyId: null,
+      selectedEventId: null,
+      selectedNewsId: null,
     })),
 
   addCompany: (company) => set((s) => ({ companies: [...s.companies, company] })),

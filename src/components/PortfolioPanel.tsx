@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { WATCH_ITEM_TYPES, SENTIMENT_COLORS } from '../types';
 import { formatDate } from '../utils';
-import { Building2, Layers, Eye, EyeOff, Trash2, Edit2, ChevronDown, ChevronRight, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Building2, Layers, Eye, EyeOff, Trash2, Edit2, ChevronDown, ChevronRight, AlertCircle, TrendingUp, TrendingDown, Minus, X, User } from 'lucide-react';
 import CompanyModal from './modals/CompanyModal';
 import WatchItemModal from './modals/WatchItemModal';
 import type { Company, WatchItem } from '../types';
@@ -36,7 +36,10 @@ export default function PortfolioPanel() {
 
   const groupedCompanies = useMemo(() => {
     let filtered = [...companies];
-    if (filterPortfolio) {
+
+    if (isMorningFilter && selectedCompanyId) {
+      filtered = filtered.filter((c) => c.id === selectedCompanyId);
+    } else if (filterPortfolio) {
       filtered = filtered.filter((c) => c.portfolio === filterPortfolio);
     }
     if (filterIndustry) {
@@ -50,7 +53,7 @@ export default function PortfolioPanel() {
       groups[key].push(c);
     });
     return groups;
-  }, [companies, groupBy, filterPortfolio, filterIndustry]);
+  }, [companies, groupBy, filterPortfolio, filterIndustry, isMorningFilter, selectedCompanyId]);
 
   const toggleGroup = (name: string) => {
     const next = new Set(expandedGroups);
@@ -173,8 +176,30 @@ export default function PortfolioPanel() {
           <h2 className="panel-title">
             <Building2 size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
             标的分组
+            {isMorningFilter && selectedCompanyId && (
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontSize: 11,
+                  color: 'var(--accent-blue)',
+                  fontWeight: 500,
+                }}
+              >
+                · 单公司视角
+              </span>
+            )}
           </h2>
           <div className="panel-actions">
+            {isMorningFilter && selectedCompanyId && (
+              <button
+                className="btn btn-ghost btn-xs"
+                onClick={() => setSelectedCompany(null)}
+                title="返回组合全量"
+              >
+                <X size={12} />
+                返回组合
+              </button>
+            )}
             <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
               共 {companies.length} 家
             </span>

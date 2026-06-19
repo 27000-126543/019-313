@@ -299,3 +299,131 @@
   color: var(--accent-purple);
 }
 
+.tracker-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tracker-group {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.tracker-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tracker-group-title {
+  flex: 1;
+  font-weight: 600;
+}
+
+.tracker-group-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 1px 8px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+}
+
+.tracker-group-items {
+  background: var(--bg-primary);
+}
+
+.tracker-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.15s;
+}
+
+.tracker-item:last-child {
+  border-bottom: none;
+}
+
+.tracker-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.tracker-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.tracker-item-event {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+
+.tracker-item-company {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tracker-item-title {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
+.tracker-item-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tracker-item-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  margin-bottom: 4px;
+  display: inline-flex;
+}
+
+.tracker-item-judgment,
+.tracker-item-impact {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 3px;
+}
+
+.tracker-item-judgment svg,
+.tracker-item-impact svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent-purple);
+}
+
+.btn-xs {
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
+

@@ -67,11 +67,14 @@ export type ExportType = 'morning' | 'close';
 export interface ExportRecord {
   id: string;
   type: ExportType;
+  templateName: string;
   filename: string;
   path: string;
   exportedAt: string;
   portfolio?: string;
   itemCount: number;
+  summary?: string;
+  content?: string;
 }
 
 export interface Opinion {

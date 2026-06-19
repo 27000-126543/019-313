@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useStore, MorningFilterMode } from '../store/useStore';
 import { formatDate } from '../utils';
 import {
@@ -18,12 +18,20 @@ import {
   Clock,
   Trash2,
   Briefcase,
+  Eye,
+  FileText,
+  Copy,
+  ChevronRight,
+  Package,
+  Target,
 } from 'lucide-react';
 import CompanyModal from './modals/CompanyModal';
 import { generateId } from '../utils';
-import type { Company, WatchItem, Opinion, ExportType } from '../types';
+import type { Company, WatchItem, Opinion, ExportType, ExportRecord } from '../types';
 import { OPINION_TYPES } from '../types';
 import './AppHeader.css';
+
+let exportCounter = 0;
 
 const BASE_FILTER_MODES: Array<{
   mode: MorningFilterMode;
@@ -55,6 +63,19 @@ export default function AppHeader() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showExportHistory, setShowExportHistory] = useState(false);
+  const [selectedExportId, setSelectedExportId] = useState<string | null>(null);
+
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const portfolios = useMemo(
     () => [...new Set(companies.map((c) => c.portfolio))],
@@ -136,8 +157,18 @@ export default function AppHeader() {
 
   const generateUniqueFilename = (baseName: string, date: string): string => {
     const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
-    return `${baseName}_${date}_${timeStr}.md`;
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const millis = now.getMilliseconds().toString().padStart(3, '0');
+    exportCounter = (exportCounter + 1) % 1000;
+    const counter = exportCounter.toString().padStart(3, '0');
+    return `${baseName}_${date}_${hours}${minutes}${seconds}_${millis}${counter}.md`;
+  };
+
+  const buildReportSummary = (content: string, maxLen = 200): string => {
+    const clean = content.replace(/[#>\-`*_[]()\n/g, ' ').replace(/\s+/g, ' ').trim();
+    return clean.length > maxLen ? clean.substring(0, maxLen) + '...' : clean;
   };
 
   const handleExportMorning = async () => {
@@ -260,16 +291,25 @@ export default function AppHeader() {
       }
     }
 
-    const filename = generateUniqueFilename('晨会讨论清单', date);
+    const templateName = activePortfolio
+      ? `晨会讨论清单 · ${activePortfolio}`
+      : '晨会讨论清单';
+    const filename = generateUniqueFilename(
+      activePortfolio ? `晨会讨论清单_${activePortfolio}` : '晨会讨论清单',
+      date
+    );
     const result = await doExport(report, filename, 'morning');
     if (result?.success) {
       addExportRecord({
         type: 'morning',
+        templateName,
         filename,
         path: result.path,
         exportedAt: new Date().toISOString(),
         portfolio: activePortfolio || undefined,
         itemCount: relevantEventIds.size + relevantCompanyIds.size,
+        summary: buildReportSummary(report),
+        content: report,
       });
     }
     setShowExportMenu(false);
@@ -291,7 +331,10 @@ export default function AppHeader() {
       todayOpinions = todayOpinions.filter((o) => portfolioCompanyIds.includes(o.companyId));
     }
 
-    const byPortfolio: Record<string, { events: typeof events; opinions: typeof opinions; companies: Set<string> }> = {};
+    const byPortfolio: Record<
+      string,
+      { events: typeof events; opinions: typeof opinions; companies: Set<string> }
+    > = {};
     for (const ev of todayEvents) {
       const c = companies.find((x) => x.id === ev.companyId);
       if (!c) continue;
@@ -362,7 +405,9 @@ export default function AppHeader() {
     }
 
     const uncategorizedEvents = todayEvents.filter(
-      (e) => !companies.find((c) => c.id === e.companyId) || !byPortfolio[companies.find((c) => c.id === e.companyId)!.portfolio]
+      (e) =>
+        !companies.find((c) => c.id === e.companyId) ||
+        !byPortfolio[companies.find((c) => c.id === e.companyId)!.portfolio]
     );
     if (uncategorizedEvents.length > 0) {
       report += `---\n\n`;
@@ -372,16 +417,25 @@ export default function AppHeader() {
       }
     }
 
-    const filename = generateUniqueFilename(activePortfolio ? `收盘复盘_${activePortfolio}` : '收盘舆情复盘', date);
+    const templateName = activePortfolio
+      ? `收盘复盘 · ${activePortfolio}`
+      : '收盘复盘报告';
+    const filename = generateUniqueFilename(
+      activePortfolio ? `收盘复盘_${activePortfolio}` : '收盘舆情复盘',
+      date
+    );
     const result = await doExport(report, filename, 'close');
     if (result?.success) {
       addExportRecord({
         type: 'close',
+        templateName,
         filename,
         path: result.path,
         exportedAt: new Date().toISOString(),
         portfolio: activePortfolio || undefined,
         itemCount: todayEvents.length + todayOpinions.length,
+        summary: buildReportSummary(report),
+        content: report,
       });
     }
     setShowExportMenu(false);
@@ -411,7 +465,14 @@ export default function AppHeader() {
     }
   };
 
-  const handleAddCompany = (data: { code: string; name: string; industry: string; portfolio: string; position: number; watchItems: WatchItem[] }) => {
+  const handleAddCompany = (data: {
+    code: string;
+    name: string;
+    industry: string;
+    portfolio: string;
+    position: number;
+    watchItems: WatchItem[];
+  }) => {
     const newCompany: Company = {
       id: generateId('comp'),
       code: data.code,
@@ -426,20 +487,29 @@ export default function AppHeader() {
     setShowAddModal(false);
   };
 
-  const openFolder = (path: string) => {
+  const openFolder = (filePath: string) => {
     if (window.electronAPI?.openPath) {
-      window.electronAPI.openPath(path);
+      window.electronAPI.openPath(filePath);
     } else {
-      alert(`文件路径：${path}`);
+      alert(`文件路径：${filePath}`);
     }
   };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard?.writeText(text);
+  };
+
+  const selectedExport = exportHistory.find((e) => e.id === selectedExportId) || null;
 
   return (
     <>
       <header className="app-header">
         <h1>舆情复盘工作站</h1>
         <div className="header-date">
-          <Calendar size={14} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+          <Calendar
+            size={14}
+            style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }}
+          />
           {formatDate(currentDate, 'YYYY年MM月DD日')}
         </div>
         <div className="header-spacer" />
@@ -448,24 +518,24 @@ export default function AppHeader() {
           <div className="morning-filter-bar">
             {allFilterModes.map(({ mode, label, icon: Icon, color }) => {
               const isActive =
-                (mode.startsWith('portfolio:') && getActivePortfolio() === mode.replace('portfolio:', '')) ||
+                (mode.startsWith('portfolio:') &&
+                  getActivePortfolio() === mode.replace('portfolio:', '')) ||
                 (!mode.startsWith('portfolio:') && morningFilterMode === mode);
               return (
                 <button
                   key={mode}
                   className={`morning-filter-chip ${isActive ? 'active' : ''}`}
                   onClick={() => setMorningFilterMode(mode)}
-                  style={isActive ? { borderColor: color, color, background: `${color}15` } : {}}
+                  style={
+                    isActive ? { borderColor: color, color, background: `${color}15` } : {}
+                  }
                 >
                   <Icon size={12} />
                   {label}
                 </button>
               );
             })}
-            <button
-              className="morning-filter-chip close-chip"
-              onClick={toggleMorningFilter}
-            >
+            <button className="morning-filter-chip close-chip" onClick={toggleMorningFilter}>
               <X size={12} />
               退出
             </button>
@@ -488,7 +558,7 @@ export default function AppHeader() {
           添加标的
         </button>
 
-        <div className="export-wrapper">
+        <div className="export-wrapper" ref={exportMenuRef}>
           <button
             className="btn btn-secondary"
             onClick={() => setShowExportMenu(!showExportMenu)}
@@ -524,7 +594,14 @@ export default function AppHeader() {
                 <History size={14} style={{ color: '#6b7280' }} />
                 <div>
                   <div className="export-menu-item-title">导出历史</div>
-                  <div className="export-menu-item-desc">查看最近导出的文件记录</div>
+                  <div className="export-menu-item-desc">
+                    查看最近导出的文件记录
+                    {exportHistory.length > 0 && (
+                      <>
+                        {' '}
+                      </>
+                    )}
+                  </div>
                 </div>
               </button>
             </div>
@@ -544,64 +621,189 @@ export default function AppHeader() {
       )}
 
       {showExportHistory && (
-        <div className="modal-overlay" onClick={() => setShowExportHistory(false)}>
-          <div className="modal export-history-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setShowExportHistory(false);
+            setSelectedExportId(null);
+          }}
+        >
+          <div
+            className="modal export-history-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <h3 className="modal-title">
                 <History size={16} style={{ marginRight: '6px' }} />
-                导出历史记录
+                导出历史台账
               </h3>
-              <button className="modal-close" onClick={() => setShowExportHistory(false)}>
+              <button
+                className="modal-close"
+                onClick={() => {
+                  setShowExportHistory(false);
+                  setSelectedExportId(null);
+                }}
+              >
                 <X size={16} />
               </button>
             </div>
-            <div className="modal-body">
-              {exportHistory.length === 0 ? (
-                <div className="empty-state">
-                  <History size={32} className="empty-state-icon" />
-                  <div className="empty-state-text">暂无导出记录</div>
-                </div>
-              ) : (
-                <>
-                  <div className="export-history-header">
-                    <span style={{ flex: 1 }}>文件名</span>
-                    <span style={{ width: 80, textAlign: 'center' }}>类型</span>
-                    <span style={{ width: 140, textAlign: 'center' }}>导出时间</span>
-                    <span style={{ width: 60, textAlign: 'center' }}>数量</span>
-                    <span style={{ width: 80, textAlign: 'center' }}>操作</span>
+            <div className="export-history-body">
+              <div className="export-history-left">
+                {exportHistory.length === 0 ? (
+                  <div className="empty-state">
+                    <History size={32} className="empty-state-icon" />
+                    <div className="empty-state-text">暂无导出记录</div>
                   </div>
-                  <div className="export-history-list">
-                    {exportHistory.map((record) => (
-                      <div key={record.id} className="export-history-item">
-                        <span className="export-history-filename" title={record.path}>
-                          <FileDown size={12} style={{ marginRight: '6px', color: record.type === 'morning' ? '#f59e0b' : '#3b82f6' }} />
-                          {record.filename}
-                        </span>
-                        <span className="export-history-type">
-                          <span className={`type-badge type-${record.type}`}>
-                            {record.type === 'morning' ? '晨会' : '收盘'}
+                ) : (
+                  <>
+                    <div className="export-history-header">
+                      <span style={{ flex: 1 }}>文件 / 模板</span>
+                      <span style={{ width: 70, textAlign: 'center' }}>组合</span>
+                      <span style={{ width: 130, textAlign: 'center' }}>导出时间</span>
+                      <span style={{ width: 50, textAlign: 'center' }}>条数</span>
+                    </div>
+                    <div className="export-history-list">
+                      {exportHistory.map((record) => (
+                        <div
+                          key={record.id}
+                          className={`export-history-item ${selectedExportId === record.id ? 'active' : ''}`}
+                          onClick={() => setSelectedExportId(record.id)}
+                        >
+                            <div className="export-history-main">
+                              <div className="export-history-file">
+                                <FileDown
+                                  size={14}
+                                  style={{
+                                    marginRight: '6px',
+                                    color:
+                                      record.type === 'morning' ? '#f59e0b' : '#3b82f6',
+                                  }}
+                                />
+                                <div>
+                                  <div className="export-history-filename">
+                                    {record.filename}
+                                  </div>
+                                  <div className="export-history-template">
+                                    <Package size={10} />
+                                    {record.templateName}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="export-history-meta">
+                                <span
+                                  className="export-history-portfolio"
+                                  title={record.portfolio || '全部组合'}
+                                >
+                                  {record.portfolio || '全部'}
+                                </span>
+                                <span className="export-history-time">
+                                  <Clock size={11} />
+                                  {formatDate(record.exportedAt, 'MM-DD HH:mm:ss')}
+                                </span>
+                                <span className="export-history-count">
+                                  {record.itemCount}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="export-history-right">
+                  {selectedExport ? (
+                    <div className="export-preview">
+                      <div className="export-preview-header">
+                      <Eye size={14} />
+                      <span>内容摘要</span>
+                    </div>
+                      <div className="export-preview-content">
+                        <div className="export-detail-row">
+                          <span className="export-detail-label">文件路径</span>
+                          <div className="export-detail-value" title={selectedExport.path}>
+                            <Target size={11} />
+                            {selectedExport.path}
+                            <button
+                              className="btn btn-ghost btn-xs"
+                              onClick={() => copyToClipboard(selectedExport.path)}
+                              title="复制路径"
+                            >
+                              <Copy size={10} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="export-detail-row">
+                          <span className="export-detail-label">导出模板</span>
+                          <span className="export-detail-value">
+                            {selectedExport.templateName}
                           </span>
-                        </span>
-                        <span className="export-history-time">
-                          <Clock size={11} style={{ marginRight: '4px' }} />
-                          {formatDate(record.exportedAt, 'MM-DD HH:mm')}
-                        </span>
-                        <span className="export-history-count">{record.itemCount}项</span>
-                        <span className="export-history-actions">
+                        </div>
+                        <div className="export-detail-row">
+                          <span className="export-detail-label">所属组合</span>
+                          <span className="export-detail-value">
+                            {selectedExport.portfolio || '全部组合'}
+                          </span>
+                        </div>
+                        <div className="export-detail-row">
+                          <span className="export-detail-label">条目数量</span>
+                          <span className="export-detail-value">
+                            {selectedExport.itemCount} 项
+                          </span>
+                        </div>
+                        <div className="export-detail-row">
+                          <span className="export-detail-label">导出时间</span>
+                          <span className="export-detail-value">
+                            {formatDate(selectedExport.exportedAt, 'YYYY-MM-DD HH:mm:ss')}
+                          </span>
+                        </div>
+                        <div className="export-detail-section">
+                          <span className="export-detail-label">摘要预览</span>
+                          <div className="export-preview-summary">
+                            {selectedExport.summary || '无摘要'}
+                          </div>
+                          {selectedExport.content && (
+                            <details className="export-preview-full">
+                              <summary>
+                                <ChevronRight size={12} />
+                                查看完整内容
+                              </summary>
+                              <pre className="export-preview-markdown">
+                                {selectedExport.content}
+                              </pre>
+                            </details>
+                          )}
+                        </div>
+                        <div className="export-preview-actions">
                           <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => openFolder(record.path)}
-                            title="打开文件位置"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => openFolder(selectedExport.path)}
                           >
                             <FolderOpen size={12} />
+                            打开文件位置
                           </button>
-                        </span>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => copyToClipboard(selectedExport.content || selectedExport.summary || '')}
+                          >
+                            <Copy size={12} />
+                            复制内容
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+                    </div>
+                  ) : (
+                    <div className="export-preview-empty">
+                      <FileText size={28} className="empty-state-icon" />
+                      <div className="empty-state-text">选择一条记录查看详情</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        点击左侧列表中的导出记录
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             {exportHistory.length > 0 && (
               <div className="modal-footer">
                 <button
@@ -609,6 +811,7 @@ export default function AppHeader() {
                   onClick={() => {
                     if (confirm('确定清空所有导出历史记录吗？')) {
                       clearExportHistory();
+                      setSelectedExportId(null);
                     }
                   }}
                 >
