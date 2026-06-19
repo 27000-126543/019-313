@@ -1,0 +1,216 @@
+.portfolio-panel .group-section {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.portfolio-panel .group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: var(--bg-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  transition: background 0.2s;
+}
+
+.portfolio-panel .group-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.portfolio-panel .group-toggle {
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.portfolio-panel .group-name {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.portfolio-panel .group-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.portfolio-panel .company-list {
+  padding: 4px;
+}
+
+.portfolio-panel .company-card {
+  padding: 10px 12px;
+  margin: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.portfolio-panel .company-card:hover {
+  background: var(--bg-secondary);
+}
+
+.portfolio-panel .company-card.selected {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--accent-blue);
+}
+
+.portfolio-panel .company-card.relevant {
+  border-left: 3px solid var(--accent-red);
+}
+
+.portfolio-panel .company-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.portfolio-panel .company-main-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.portfolio-panel .company-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.portfolio-panel .company-code {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.portfolio-panel .position-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-green);
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.portfolio-panel .company-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.portfolio-panel .stat-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+}
+
+.portfolio-panel .sentiment-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.portfolio-panel .events-badge {
+  color: var(--accent-yellow);
+}
+
+.portfolio-panel .opinion-badge {
+  color: var(--accent-purple);
+}
+
+.portfolio-panel .importance-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+}
+
+.portfolio-panel .importance-indicator.high {
+  background: var(--accent-red);
+}
+
+.portfolio-panel .company-watch-items {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.portfolio-panel .watch-items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.portfolio-panel .watch-items-title {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.portfolio-panel .watch-item-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+}
+
+.portfolio-panel .watch-item-toggle {
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.portfolio-panel .watch-item-toggle:hover {
+  color: var(--text-primary);
+}
+
+.portfolio-panel .watch-item-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.portfolio-panel .watch-item-name.disabled {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.portfolio-panel .watch-item-actions {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.portfolio-panel .watch-item-row:hover .watch-item-actions {
+  opacity: 1;
+}
+
+.portfolio-panel .company-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+}
