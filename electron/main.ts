@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -52,13 +52,24 @@ ipcMain.handle('save-data', (_event, data) => {
   return { success: true };
 });
 
-ipcMain.handle('export-report', (_event, content) => {
-  const exportPath = path.join(
-    app.getPath('documents'),
-    `舆情复盘_${new Date().toISOString().split('T')[0]}.md`
-  );
+ipcMain.handle('export-report', (_event, content, filename) => {
+  const docsPath = app.getPath('documents');
+  const exportFilename = filename || `舆情复盘_${new Date().toISOString().split('T')[0]}.md`;
+  const exportPath = path.join(docsPath, exportFilename);
   fs.writeFileSync(exportPath, content);
   return { success: true, path: exportPath };
+});
+
+ipcMain.handle('open-path', async (_event, filePath) => {
+  try {
+    const result = await shell.openPath(filePath);
+    if (result) {
+      await shell.showItemInFolder(filePath);
+    }
+    return { success: true };
+  } catch {
+    return { success: false };
+  }
 });
 
 app.whenReady().then(() => {

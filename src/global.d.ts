@@ -5,7 +5,8 @@ declare global {
     electronAPI: {
       loadData: () => Promise<Record<string, unknown>>;
       saveData: (data: unknown) => Promise<{ success: boolean }>;
-      exportReport: (content: string) => Promise<{ success: boolean; path: string }>;
+      exportReport: (content: string, filename?: string) => Promise<{ success: boolean; path: string }>;
+      openPath: (filePath: string) => Promise<{ success: boolean }>;
     };
   }
 }

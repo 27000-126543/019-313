@@ -62,6 +62,18 @@ export interface Event {
   createdAt: string;
 }
 
+export type ExportType = 'morning' | 'close';
+
+export interface ExportRecord {
+  id: string;
+  type: ExportType;
+  filename: string;
+  path: string;
+  exportedAt: string;
+  portfolio?: string;
+  itemCount: number;
+}
+
 export interface Opinion {
   id: string;
   eventId?: string;
@@ -89,6 +101,7 @@ export interface AppData {
   news: NewsItem[];
   events: Event[];
   opinions: Opinion[];
+  exportHistory: ExportRecord[];
 }
 
 export const WATCH_ITEM_TYPES: Record<WatchItemType, string> = {

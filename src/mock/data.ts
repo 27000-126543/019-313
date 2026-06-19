@@ -343,5 +343,6 @@ export function generateMockData() {
     news: mockNews,
     events: mockEvents,
     opinions: mockOpinions,
+    exportHistory: [],
   };
 }

@@ -141,13 +141,18 @@ export default function PortfolioPanel() {
     if (!company) return false;
     const stats = getCompanyStats(companyId);
 
+    if (typeof morningFilterMode === 'string' && morningFilterMode.startsWith('portfolio:')) {
+      const portfolioName = morningFilterMode.replace('portfolio:', '');
+      return company.portfolio === portfolioName;
+    }
+
     switch (morningFilterMode) {
       case 'all':
         return stats.hasHighImportance || stats.importantOpinionCount > 0 || stats.sentimentCounts.negative > 0;
       case 'core_portfolio':
         return company.portfolio === '核心持仓';
       case 'negative_sentiment':
-        return stats.sentimentCounts.negative > 0 || stats.eventCount > 0 && events.some((e) => e.companyId === companyId && e.sentiment === 'negative');
+        return stats.sentimentCounts.negative > 0 || (stats.eventCount > 0 && events.some((e) => e.companyId === companyId && e.sentiment === 'negative'));
       case 'need_verify':
       case 'risk_warning': {
         const type = morningFilterMode;

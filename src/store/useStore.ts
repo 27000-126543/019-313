@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppData, Company, NewsItem, Event, Opinion, EventConclusion } from '../types';
+import type { AppData, Company, NewsItem, Event, Opinion, EventConclusion, ExportRecord, ExportType } from '../types';
 
 export type MorningFilterMode =
   | 'off'
@@ -7,7 +7,8 @@ export type MorningFilterMode =
   | 'core_portfolio'
   | 'negative_sentiment'
   | 'need_verify'
-  | 'risk_warning';
+  | 'risk_warning'
+  | `portfolio:${string}`;
 
 interface StoreState extends AppData {
   selectedCompanyId: string | null;
@@ -41,6 +42,8 @@ interface StoreState extends AppData {
   addOpinion: (opinion: Opinion) => void;
   updateOpinion: (opinion: Opinion) => void;
   deleteOpinion: (id: string) => void;
+  addExportRecord: (record: Omit<ExportRecord, 'id'>) => void;
+  clearExportHistory: () => void;
   loadData: (data: AppData) => void;
   getExportData: () => AppData;
 }
@@ -50,6 +53,7 @@ const initialState: AppData = {
   news: [],
   events: [],
   opinions: [],
+  exportHistory: [],
 };
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -141,15 +145,27 @@ export const useStore = create<StoreState>((set, get) => ({
     const newNewsIds = event.newsIds.includes(newsId) ? event.newsIds : [...event.newsIds, newsId];
     const relatedNews = state.news.filter((n) => newNewsIds.includes(n.id));
 
+    const sentiments = relatedNews.map((n) => n.sentiment);
+    const sentiment = sentiments.includes('negative')
+      ? 'negative'
+      : sentiments.includes('positive')
+      ? 'positive'
+      : 'neutral';
+
     set((s) => ({
       events: s.events.map((e) =>
         e.id === eventId
           ? {
               ...e,
               newsIds: newNewsIds,
+              startTime: new Date(
+                Math.min(...relatedNews.map((n) => new Date(n.publishTime).getTime()))
+              ).toISOString(),
               endTime: new Date(
                 Math.max(...relatedNews.map((n) => new Date(n.publishTime).getTime()))
               ).toISOString(),
+              tags: [...new Set(relatedNews.flatMap((n) => n.tags))],
+              sentiment,
             }
           : e
       ),
@@ -174,9 +190,18 @@ export const useStore = create<StoreState>((set, get) => ({
     })),
   deleteOpinion: (id) => set((s) => ({ opinions: s.opinions.filter((o) => o.id !== id) })),
 
+  addExportRecord: (record) =>
+    set((s) => ({
+      exportHistory: [
+        { ...record, id: `exp_${Date.now()}` },
+        ...s.exportHistory,
+      ].slice(0, 20),
+    })),
+  clearExportHistory: () => set({ exportHistory: [] }),
+
   loadData: (data) => set(data),
   getExportData: () => {
-    const { companies, news, events, opinions } = get();
-    return { companies, news, events, opinions };
+    const { companies, news, events, opinions, exportHistory } = get();
+    return { companies, news, events, opinions, exportHistory };
   },
 }));

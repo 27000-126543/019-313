@@ -67,33 +67,50 @@ export default function TimelinePanel() {
         const company = companies.find((c) => c.id === ev.companyId);
         let keep = false;
 
-        switch (morningFilterMode) {
-          case 'all':
-            keep = ev.importance === 'high';
-            break;
-          case 'core_portfolio':
-            keep = company?.portfolio === '核心持仓';
-            break;
-          case 'negative_sentiment':
-            keep = ev.sentiment === 'negative';
-            break;
-          case 'need_verify':
-          case 'risk_warning': {
-            const type = morningFilterMode;
-            const hasOpinion = opinions.some(
-              (o) =>
-                o.eventId === ev.id &&
-                o.type === type &&
-                formatDate(o.createdAt) === currentDate
-            );
-            keep = hasOpinion;
-            break;
+        if (typeof morningFilterMode === 'string' && morningFilterMode.startsWith('portfolio:')) {
+          const portfolioName = morningFilterMode.replace('portfolio:', '');
+          keep = company?.portfolio === portfolioName;
+        } else {
+          switch (morningFilterMode) {
+            case 'all':
+              keep = ev.importance === 'high';
+              break;
+            case 'core_portfolio':
+              keep = company?.portfolio === '核心持仓';
+              break;
+            case 'negative_sentiment':
+              keep = ev.sentiment === 'negative';
+              break;
+            case 'need_verify':
+            case 'risk_warning': {
+              const type = morningFilterMode;
+              const hasOpinion = opinions.some(
+                (o) =>
+                  o.eventId === ev.id &&
+                  o.type === type &&
+                  formatDate(o.createdAt) === currentDate
+              );
+              keep = hasOpinion;
+              break;
+            }
           }
         }
         if (keep) matchedEventIds.add(ev.id);
       }
 
-      if (morningFilterMode === 'need_verify' || morningFilterMode === 'risk_warning') {
+      if (typeof morningFilterMode === 'string' && morningFilterMode.startsWith('portfolio:')) {
+        const portfolioName = morningFilterMode.replace('portfolio:', '');
+        for (const c of companies) {
+          if (c.portfolio === portfolioName) matchedCompanyIds.add(c.id);
+        }
+        for (const op of opinions) {
+          if (formatDate(op.createdAt) !== currentDate) continue;
+          const opCompany = companies.find((c) => c.id === op.companyId);
+          if (opCompany?.portfolio === portfolioName) {
+            matchedCompanyIds.add(op.companyId);
+          }
+        }
+      } else if (morningFilterMode === 'need_verify' || morningFilterMode === 'risk_warning') {
         const type = morningFilterMode;
         for (const op of opinions) {
           if (formatDate(op.createdAt) !== currentDate) continue;

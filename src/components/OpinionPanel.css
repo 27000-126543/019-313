@@ -166,3 +166,136 @@
   font-size: 10px;
   color: var(--text-muted);
 }
+
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.view-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.view-tab:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.view-tab.active {
+  background: var(--bg-tertiary);
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.view-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--accent-purple);
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 9px;
+  margin-left: 4px;
+}
+
+.conclusions-summary {
+  padding: 8px 12px;
+}
+
+.conclusion-section {
+  margin-bottom: 16px;
+}
+
+.conclusion-section:last-child {
+  margin-bottom: 0;
+}
+
+.conclusion-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border-radius: 6px 6px 0 0;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+}
+
+.conclusion-section-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.conclusion-section-count {
+  font-size: 11px;
+  color: var(--accent-purple);
+  font-weight: 600;
+}
+
+.conclusion-section-items {
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+}
+
+.conclusion-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.15s;
+}
+
+.conclusion-item:last-child {
+  border-bottom: none;
+}
+
+.conclusion-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.conclusion-item-event {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.conclusion-item-value {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.conclusion-item-value svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-purple);
+}
+

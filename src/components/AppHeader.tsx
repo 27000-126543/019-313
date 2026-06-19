@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useStore, MorningFilterMode } from '../store/useStore';
 import { formatDate } from '../utils';
 import {
@@ -13,21 +13,25 @@ import {
   AlertTriangle,
   FileDown,
   X,
+  History,
+  FolderOpen,
+  Clock,
+  Trash2,
+  Briefcase,
 } from 'lucide-react';
 import CompanyModal from './modals/CompanyModal';
 import { generateId } from '../utils';
-import type { Company, WatchItem, Opinion } from '../types';
+import type { Company, WatchItem, Opinion, ExportType } from '../types';
 import { OPINION_TYPES } from '../types';
 import './AppHeader.css';
 
-const FILTER_MODES: Array<{
+const BASE_FILTER_MODES: Array<{
   mode: MorningFilterMode;
   label: string;
   icon: typeof Sun;
   color: string;
 }> = [
   { mode: 'all', label: '全部重点', icon: Sun, color: '#f59e0b' },
-  { mode: 'core_portfolio', label: '核心持仓', icon: Layers, color: '#3b82f6' },
   { mode: 'negative_sentiment', label: '负面舆情', icon: TrendingDown, color: '#ef4444' },
   { mode: 'need_verify', label: '需电话核实', icon: Phone, color: '#f97316' },
   { mode: 'risk_warning', label: '风险提示', icon: AlertTriangle, color: '#dc2626' },
@@ -40,19 +44,48 @@ export default function AppHeader() {
   const setMorningFilterMode = useStore((s) => s.setMorningFilterMode);
   const toggleMorningFilter = useStore((s) => s.toggleMorningFilter);
   const addCompany = useStore((s) => s.addCompany);
+  const addExportRecord = useStore((s) => s.addExportRecord);
+  const clearExportHistory = useStore((s) => s.clearExportHistory);
   const companies = useStore((s) => s.companies);
   const events = useStore((s) => s.events);
   const news = useStore((s) => s.news);
   const opinions = useStore((s) => s.opinions);
+  const exportHistory = useStore((s) => s.exportHistory);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showExportHistory, setShowExportHistory] = useState(false);
+
+  const portfolios = useMemo(
+    () => [...new Set(companies.map((c) => c.portfolio))],
+    [companies]
+  );
+
+  const allFilterModes = useMemo(() => {
+    const portfolioModes = portfolios.map((p) => ({
+      mode: `portfolio:${p}` as MorningFilterMode,
+      label: p,
+      icon: Briefcase,
+      color: '#8b5cf6',
+    }));
+    return [...BASE_FILTER_MODES, ...portfolioModes];
+  }, [portfolios]);
+
+  const getActivePortfolio = (): string | null => {
+    if (typeof morningFilterMode === 'string' && morningFilterMode.startsWith('portfolio:')) {
+      return morningFilterMode.replace('portfolio:', '');
+    }
+    return null;
+  };
 
   const buildEventReport = (eventId: string) => {
     const event = events.find((e) => e.id === eventId);
     if (!event) return '';
     const company = companies.find((c) => c.id === event.companyId);
     const relatedOpinions = opinions.filter((o) => o.eventId === eventId);
-    const relatedNews = news.filter((n) => event.newsIds.includes(n.id));
+    const relatedNews = news
+      .filter((n) => event.newsIds.includes(n.id))
+      .sort((a, b) => new Date(a.publishTime).getTime() - new Date(b.publishTime).getTime());
 
     let text = '';
     text += `### ${company?.name || '未知'} - ${event.title}\n\n`;
@@ -60,6 +93,7 @@ export default function AppHeader() {
     text += `- 情感：${event.sentiment === 'positive' ? '正面' : event.sentiment === 'negative' ? '负面' : '中性'}\n`;
     text += `- 时间：${formatDate(event.startTime, 'HH:mm')} - ${formatDate(event.endTime, 'HH:mm')}\n`;
     text += `- 关联舆情：${event.newsIds.length}条\n`;
+    text += `- 标签：${event.tags.join('、') || '无'}\n`;
 
     if (event.conclusion) {
       if (event.conclusion.coreJudgment) {
@@ -83,7 +117,7 @@ export default function AppHeader() {
     }
 
     if (relatedNews.length > 0) {
-      text += `- 舆情摘要：\n`;
+      text += `- 舆情摘要（按时间顺序）：\n`;
       for (const n of relatedNews) {
         text += `  - ${formatDate(n.publishTime, 'HH:mm')} ${n.source}：${n.title}\n`;
       }
@@ -100,20 +134,28 @@ export default function AppHeader() {
     return text;
   };
 
+  const generateUniqueFilename = (baseName: string, date: string): string => {
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`;
+    return `${baseName}_${date}_${timeStr}.md`;
+  };
+
   const handleExportMorning = async () => {
     const date = formatDate(currentDate);
     const today = date;
+    const activePortfolio = getActivePortfolio();
 
     const relevantEventIds = new Set<string>();
     const relevantCompanyIds = new Set<string>();
 
     for (const ev of events) {
       if (formatDate(ev.startTime) !== today) continue;
+      const company = companies.find((c) => c.id === ev.companyId);
+
       if (morningFilterMode === 'all') {
         if (ev.importance === 'high') relevantEventIds.add(ev.id);
-      } else if (morningFilterMode === 'core_portfolio') {
-        const company = companies.find((c) => c.id === ev.companyId);
-        if (company?.portfolio === '核心持仓') relevantEventIds.add(ev.id);
+      } else if (activePortfolio) {
+        if (company?.portfolio === activePortfolio) relevantEventIds.add(ev.id);
       } else if (morningFilterMode === 'negative_sentiment') {
         if (ev.sentiment === 'negative') relevantEventIds.add(ev.id);
       } else if (morningFilterMode === 'need_verify' || morningFilterMode === 'risk_warning') {
@@ -127,6 +169,8 @@ export default function AppHeader() {
 
     for (const op of opinions) {
       if (formatDate(op.createdAt) !== today) continue;
+      const company = companies.find((c) => c.id === op.companyId);
+
       if (morningFilterMode === 'need_verify' && op.type === 'need_verify') {
         relevantCompanyIds.add(op.companyId);
         if (op.eventId) relevantEventIds.add(op.eventId);
@@ -135,15 +179,14 @@ export default function AppHeader() {
         relevantCompanyIds.add(op.companyId);
         if (op.eventId) relevantEventIds.add(op.eventId);
       }
-      if (morningFilterMode === 'core_portfolio') {
-        const company = companies.find((c) => c.id === op.companyId);
-        if (company?.portfolio === '核心持仓') relevantCompanyIds.add(op.companyId);
+      if (activePortfolio && company?.portfolio === activePortfolio) {
+        relevantCompanyIds.add(op.companyId);
       }
     }
 
-    if (morningFilterMode === 'core_portfolio') {
+    if (activePortfolio) {
       for (const c of companies) {
-        if (c.portfolio === '核心持仓') relevantCompanyIds.add(c.id);
+        if (c.portfolio === activePortfolio) relevantCompanyIds.add(c.id);
       }
     }
 
@@ -158,8 +201,8 @@ export default function AppHeader() {
 
     if (morningFilterMode === 'all') {
       report += `> 筛选维度：今日全部高重要性事件\n\n`;
-    } else if (morningFilterMode === 'core_portfolio') {
-      report += `> 筛选维度：核心持仓组合（含待讨论事件、观点沉淀）\n\n`;
+    } else if (activePortfolio) {
+      report += `> 筛选维度：${activePortfolio}组合（含待讨论事件、观点沉淀）\n\n`;
     } else if (morningFilterMode === 'negative_sentiment') {
       report += `> 筛选维度：今日负面舆情（需关注风险）\n\n`;
     } else if (morningFilterMode === 'need_verify') {
@@ -217,16 +260,36 @@ export default function AppHeader() {
       }
     }
 
-    await doExport(report, `晨会讨论清单_${date}.md`);
+    const filename = generateUniqueFilename('晨会讨论清单', date);
+    const result = await doExport(report, filename, 'morning');
+    if (result?.success) {
+      addExportRecord({
+        type: 'morning',
+        filename,
+        path: result.path,
+        exportedAt: new Date().toISOString(),
+        portfolio: activePortfolio || undefined,
+        itemCount: relevantEventIds.size + relevantCompanyIds.size,
+      });
+    }
     setShowExportMenu(false);
   };
 
   const handleExportClose = async () => {
     const date = formatDate(currentDate);
     const today = date;
+    const activePortfolio = getActivePortfolio();
 
-    const todayEvents = events.filter((e) => formatDate(e.startTime) === today);
-    const todayOpinions = opinions.filter((o) => formatDate(o.createdAt) === today);
+    let todayEvents = events.filter((e) => formatDate(e.startTime) === today);
+    let todayOpinions = opinions.filter((o) => formatDate(o.createdAt) === today);
+
+    if (activePortfolio) {
+      const portfolioCompanyIds = companies
+        .filter((c) => c.portfolio === activePortfolio)
+        .map((c) => c.id);
+      todayEvents = todayEvents.filter((e) => portfolioCompanyIds.includes(e.companyId));
+      todayOpinions = todayOpinions.filter((o) => portfolioCompanyIds.includes(o.companyId));
+    }
 
     const byPortfolio: Record<string, { events: typeof events; opinions: typeof opinions; companies: Set<string> }> = {};
     for (const ev of todayEvents) {
@@ -248,7 +311,12 @@ export default function AppHeader() {
       byPortfolio[c.portfolio].companies.add(c.id);
     }
 
-    let report = `# 收盘舆情复盘报告 - ${date}\n\n`;
+    let reportTitle = '收盘舆情复盘报告';
+    if (activePortfolio) {
+      reportTitle = `${activePortfolio} - 收盘舆情复盘报告`;
+    }
+
+    let report = `# ${reportTitle} - ${date}\n\n`;
     report += `> 按投资组合汇总今日风险与观点沉淀，用于盘后复盘与周报复盘参考。\n\n`;
 
     report += `## 总览\n\n`;
@@ -304,16 +372,33 @@ export default function AppHeader() {
       }
     }
 
-    await doExport(report, `收盘舆情复盘_${date}.md`);
+    const filename = generateUniqueFilename(activePortfolio ? `收盘复盘_${activePortfolio}` : '收盘舆情复盘', date);
+    const result = await doExport(report, filename, 'close');
+    if (result?.success) {
+      addExportRecord({
+        type: 'close',
+        filename,
+        path: result.path,
+        exportedAt: new Date().toISOString(),
+        portfolio: activePortfolio || undefined,
+        itemCount: todayEvents.length + todayOpinions.length,
+      });
+    }
     setShowExportMenu(false);
   };
 
-  const doExport = async (content: string, filename: string) => {
+  const doExport = async (
+    content: string,
+    filename: string,
+    _type: ExportType
+  ): Promise<{ success: boolean; path: string } | null> => {
     if (window.electronAPI?.exportReport) {
-      const result = await window.electronAPI.exportReport(content);
+      const result = await window.electronAPI.exportReport(content, filename);
       if (result.success) {
         alert(`报告已导出至：${result.path}`);
+        return { success: true, path: result.path };
       }
+      return null;
     } else {
       const blob = new Blob([content], { type: 'text/markdown' });
       const url = URL.createObjectURL(blob);
@@ -322,6 +407,7 @@ export default function AppHeader() {
       a.download = filename;
       a.click();
       URL.revokeObjectURL(url);
+      return { success: true, path: `下载/${filename}` };
     }
   };
 
@@ -340,6 +426,14 @@ export default function AppHeader() {
     setShowAddModal(false);
   };
 
+  const openFolder = (path: string) => {
+    if (window.electronAPI?.openPath) {
+      window.electronAPI.openPath(path);
+    } else {
+      alert(`文件路径：${path}`);
+    }
+  };
+
   return (
     <>
       <header className="app-header">
@@ -352,17 +446,22 @@ export default function AppHeader() {
 
         {isMorningFilter && (
           <div className="morning-filter-bar">
-            {FILTER_MODES.map(({ mode, label, icon: Icon, color }) => (
-              <button
-                key={mode}
-                className={`morning-filter-chip ${morningFilterMode === mode ? 'active' : ''}`}
-                onClick={() => setMorningFilterMode(mode)}
-                style={morningFilterMode === mode ? { borderColor: color, color, background: `${color}15` } : {}}
-              >
-                <Icon size={12} />
-                {label}
-              </button>
-            ))}
+            {allFilterModes.map(({ mode, label, icon: Icon, color }) => {
+              const isActive =
+                (mode.startsWith('portfolio:') && getActivePortfolio() === mode.replace('portfolio:', '')) ||
+                (!mode.startsWith('portfolio:') && morningFilterMode === mode);
+              return (
+                <button
+                  key={mode}
+                  className={`morning-filter-chip ${isActive ? 'active' : ''}`}
+                  onClick={() => setMorningFilterMode(mode)}
+                  style={isActive ? { borderColor: color, color, background: `${color}15` } : {}}
+                >
+                  <Icon size={12} />
+                  {label}
+                </button>
+              );
+            })}
             <button
               className="morning-filter-chip close-chip"
               onClick={toggleMorningFilter}
@@ -414,6 +513,20 @@ export default function AppHeader() {
                   <div className="export-menu-item-desc">按组合汇总风险与观点沉淀</div>
                 </div>
               </button>
+              <div className="export-menu-divider" />
+              <button
+                className="export-menu-item"
+                onClick={() => {
+                  setShowExportMenu(false);
+                  setShowExportHistory(true);
+                }}
+              >
+                <History size={14} style={{ color: '#6b7280' }} />
+                <div>
+                  <div className="export-menu-item-title">导出历史</div>
+                  <div className="export-menu-item-desc">查看最近导出的文件记录</div>
+                </div>
+              </button>
             </div>
           )}
         </div>
@@ -428,6 +541,84 @@ export default function AppHeader() {
           onClose={() => setShowAddModal(false)}
           onSubmit={handleAddCompany}
         />
+      )}
+
+      {showExportHistory && (
+        <div className="modal-overlay" onClick={() => setShowExportHistory(false)}>
+          <div className="modal export-history-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">
+                <History size={16} style={{ marginRight: '6px' }} />
+                导出历史记录
+              </h3>
+              <button className="modal-close" onClick={() => setShowExportHistory(false)}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {exportHistory.length === 0 ? (
+                <div className="empty-state">
+                  <History size={32} className="empty-state-icon" />
+                  <div className="empty-state-text">暂无导出记录</div>
+                </div>
+              ) : (
+                <>
+                  <div className="export-history-header">
+                    <span style={{ flex: 1 }}>文件名</span>
+                    <span style={{ width: 80, textAlign: 'center' }}>类型</span>
+                    <span style={{ width: 140, textAlign: 'center' }}>导出时间</span>
+                    <span style={{ width: 60, textAlign: 'center' }}>数量</span>
+                    <span style={{ width: 80, textAlign: 'center' }}>操作</span>
+                  </div>
+                  <div className="export-history-list">
+                    {exportHistory.map((record) => (
+                      <div key={record.id} className="export-history-item">
+                        <span className="export-history-filename" title={record.path}>
+                          <FileDown size={12} style={{ marginRight: '6px', color: record.type === 'morning' ? '#f59e0b' : '#3b82f6' }} />
+                          {record.filename}
+                        </span>
+                        <span className="export-history-type">
+                          <span className={`type-badge type-${record.type}`}>
+                            {record.type === 'morning' ? '晨会' : '收盘'}
+                          </span>
+                        </span>
+                        <span className="export-history-time">
+                          <Clock size={11} style={{ marginRight: '4px' }} />
+                          {formatDate(record.exportedAt, 'MM-DD HH:mm')}
+                        </span>
+                        <span className="export-history-count">{record.itemCount}项</span>
+                        <span className="export-history-actions">
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => openFolder(record.path)}
+                            title="打开文件位置"
+                          >
+                            <FolderOpen size={12} />
+                          </button>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            {exportHistory.length > 0 && (
+              <div className="modal-footer">
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => {
+                    if (confirm('确定清空所有导出历史记录吗？')) {
+                      clearExportHistory();
+                    }
+                  }}
+                >
+                  <Trash2 size={12} />
+                  清空历史
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   );
