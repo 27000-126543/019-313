@@ -383,3 +383,247 @@
   background: rgba(59, 130, 246, 0.15);
   color: #3b82f6;
 }
+
+.export-history-modal.large {
+  width: 1080px;
+}
+
+.export-history-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.export-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.export-filter-group .filter-select {
+  min-width: 120px;
+}
+
+.export-filter-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.export-history-item.compared {
+  background: rgba(139, 92, 246, 0.08);
+  border-left: 3px solid #8b5cf6;
+}
+
+.export-compare-checkbox {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-color);
+  border-radius: 4px;
+  margin-right: 8px;
+  background: var(--bg-primary);
+  color: var(--accent-purple);
+  font-weight: 700;
+}
+
+.export-history-item.compared .export-compare-checkbox {
+  background: var(--accent-purple);
+  border-color: var(--accent-purple);
+  color: white;
+}
+
+.export-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid;
+  margin-left: 6px;
+  line-height: 1.5;
+}
+
+.export-status-badge.large {
+  padding: 3px 10px;
+  font-size: 11px;
+  margin-left: 0;
+}
+
+.export-status-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.export-status-section .export-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.export-status-section .filter-select {
+  flex: 1;
+}
+
+.text-input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.text-input:focus {
+  border-color: var(--accent-blue);
+}
+
+.text-input.textarea {
+  min-height: 60px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.export-detail-value.remark {
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.export-compare-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.export-compare-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.export-compare-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: block;
+}
+
+.export-compare-subtitle {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-compare-grid {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.export-compare-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.export-compare-col-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.export-compare-col-body {
+  flex: 1;
+  padding: 10px 12px;
+  overflow-y: auto;
+}
+
+.export-compare-divider {
+  width: 32px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+}
+
+.export-compare-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.export-compare-label {
+  width: 56px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.export-compare-value {
+  flex: 1;
+  color: var(--text-primary);
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.export-compare-section {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.export-compare-summary {
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.export-compare-diff {
+  font-size: 10px;
+  font-weight: 700;
+}

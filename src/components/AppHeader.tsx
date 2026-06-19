@@ -24,11 +24,20 @@ import {
   ChevronRight,
   Package,
   Target,
+  Filter,
+  GitCompare,
+  Check,
+  MessageSquare,
+  Send,
+  Archive,
+  Edit3,
+  Save,
+  User,
 } from 'lucide-react';
 import CompanyModal from './modals/CompanyModal';
 import { generateId } from '../utils';
-import type { Company, WatchItem, Opinion, ExportType, ExportRecord } from '../types';
-import { OPINION_TYPES } from '../types';
+import type { Company, WatchItem, Opinion, ExportType, ExportRecord, ExportStatus } from '../types';
+import { OPINION_TYPES, EXPORT_STATUS_LABELS } from '../types';
 import './AppHeader.css';
 
 let exportCounter = 0;
@@ -53,6 +62,7 @@ export default function AppHeader() {
   const toggleMorningFilter = useStore((s) => s.toggleMorningFilter);
   const addCompany = useStore((s) => s.addCompany);
   const addExportRecord = useStore((s) => s.addExportRecord);
+  const updateExportRecord = useStore((s) => s.updateExportRecord);
   const clearExportHistory = useStore((s) => s.clearExportHistory);
   const companies = useStore((s) => s.companies);
   const events = useStore((s) => s.events);
@@ -64,6 +74,15 @@ export default function AppHeader() {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showExportHistory, setShowExportHistory] = useState(false);
   const [selectedExportId, setSelectedExportId] = useState<string | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [filterTemplate, setFilterTemplate] = useState<'all' | ExportType>('all');
+  const [filterPortfolio, setFilterPortfolio] = useState<string>('all');
+  const [filterDateRange, setFilterDateRange] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [editingStatus, setEditingStatus] = useState(false);
+  const [editStatus, setEditStatus] = useState<ExportStatus | ''>('');
+  const [editRecipient, setEditRecipient] = useState('');
+  const [editRemark, setEditRemark] = useState('');
 
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -97,6 +116,75 @@ export default function AppHeader() {
       return morningFilterMode.replace('portfolio:', '');
     }
     return null;
+  };
+
+  const exportPortfolios = useMemo(
+    () => ['all', ...new Set(exportHistory.map((r) => r.portfolio).filter(Boolean) as string[])],
+    [exportHistory]
+  );
+
+  const filteredExportHistory = useMemo(() => {
+    let filtered = [...exportHistory];
+
+    if (filterTemplate !== 'all') {
+      filtered = filtered.filter((r) => r.type === filterTemplate);
+    }
+    if (filterPortfolio !== 'all') {
+      filtered = filtered.filter((r) => r.portfolio === filterPortfolio);
+    }
+    if (filterDateRange !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      filtered = filtered.filter((r) => {
+        const d = new Date(r.exportedAt);
+        if (filterDateRange === 'today') {
+          return d >= today;
+        } else if (filterDateRange === 'week') {
+          const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+          return d >= weekAgo;
+        } else if (filterDateRange === 'month') {
+          const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+          return d >= monthAgo;
+        }
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [exportHistory, filterTemplate, filterPortfolio, filterDateRange]);
+
+  const selectedExport = exportHistory.find((e) => e.id === selectedExportId) || null;
+  const compareRecords = compareIds
+    .map((id) => exportHistory.find((e) => e.id === id))
+    .filter(Boolean) as ExportRecord[];
+
+  const toggleCompareId = (id: string) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((x) => x !== id);
+      }
+      if (prev.length >= 2) {
+        return [prev[1], id];
+      }
+      return [...prev, id];
+    });
+  };
+
+  const startEditStatus = (record: ExportRecord) => {
+    setEditStatus(record.status || '');
+    setEditRecipient(record.recipient || '');
+    setEditRemark(record.remark || '');
+    setEditingStatus(true);
+  };
+
+  const saveStatusEdit = () => {
+    if (!selectedExportId) return;
+    updateExportRecord(selectedExportId, {
+      status: editStatus || undefined,
+      recipient: editRecipient || undefined,
+      remark: editRemark || undefined,
+    });
+    setEditingStatus(false);
   };
 
   const buildEventReport = (eventId: string) => {
@@ -499,8 +587,6 @@ export default function AppHeader() {
     navigator.clipboard?.writeText(text);
   };
 
-  const selectedExport = exportHistory.find((e) => e.id === selectedExportId) || null;
-
   return (
     <>
       <header className="app-header">
@@ -626,10 +712,13 @@ export default function AppHeader() {
           onClick={() => {
             setShowExportHistory(false);
             setSelectedExportId(null);
+            setCompareMode(false);
+            setCompareIds([]);
+            setEditingStatus(false);
           }}
         >
           <div
-            className="modal export-history-modal"
+            className="modal export-history-modal large"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
@@ -637,38 +726,115 @@ export default function AppHeader() {
                 <History size={16} style={{ marginRight: '6px' }} />
                 导出历史台账
               </h3>
-              <button
-                className="modal-close"
-                onClick={() => {
-                  setShowExportHistory(false);
-                  setSelectedExportId(null);
-                }}
-              >
-                <X size={16} />
-              </button>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <button
+                  className={`btn btn-ghost btn-sm ${compareMode ? 'active' : ''}`}
+                  onClick={() => {
+                    setCompareMode(!compareMode);
+                    if (compareMode) setCompareIds([]);
+                  }}
+                  title="对比模式"
+                >
+                  <GitCompare size={12} />
+                  {compareMode ? '退出对比' : '对比'}
+                </button>
+                <button
+                  className="modal-close"
+                  onClick={() => {
+                    setShowExportHistory(false);
+                    setSelectedExportId(null);
+                    setCompareMode(false);
+                    setCompareIds([]);
+                    setEditingStatus(false);
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+
+            <div className="export-history-filters">
+              <div className="export-filter-group">
+                <Filter size={12} style={{ color: 'var(--text-muted)' }} />
+                <select
+                  className="filter-select"
+                  value={filterTemplate}
+                  onChange={(e) => setFilterTemplate(e.target.value as 'all' | ExportType)}
+                >
+                  <option value="all">全部模板</option>
+                  <option value="morning">晨会讨论清单</option>
+                  <option value="close">收盘复盘报告</option>
+                </select>
+              </div>
+              <div className="export-filter-group">
+                <Briefcase size={12} style={{ color: 'var(--text-muted)' }} />
+                <select
+                  className="filter-select"
+                  value={filterPortfolio}
+                  onChange={(e) => setFilterPortfolio(e.target.value)}
+                >
+                  <option value="all">全部组合</option>
+                  {exportPortfolios.filter((p) => p !== 'all').map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="export-filter-group">
+                <Calendar size={12} style={{ color: 'var(--text-muted)' }} />
+                <select
+                  className="filter-select"
+                  value={filterDateRange}
+                  onChange={(e) => setFilterDateRange(e.target.value as 'all' | 'today' | 'week' | 'month')}
+                >
+                  <option value="all">全部时间</option>
+                  <option value="today">今天</option>
+                  <option value="week">近7天</option>
+                  <option value="month">近30天</option>
+                </select>
+              </div>
+              <span className="export-filter-count">
+                共 {filteredExportHistory.length} 条
+              </span>
+            </div>
+
             <div className="export-history-body">
               <div className="export-history-left">
-                {exportHistory.length === 0 ? (
+                {filteredExportHistory.length === 0 ? (
                   <div className="empty-state">
                     <History size={32} className="empty-state-icon" />
-                    <div className="empty-state-text">暂无导出记录</div>
+                    <div className="empty-state-text">暂无符合条件的导出记录</div>
                   </div>
                 ) : (
                   <>
                     <div className="export-history-header">
-                      <span style={{ flex: 1 }}>文件 / 模板</span>
+                      <span style={{ flex: 1 }}>文件 / 模板 / 状态</span>
                       <span style={{ width: 70, textAlign: 'center' }}>组合</span>
                       <span style={{ width: 130, textAlign: 'center' }}>导出时间</span>
                       <span style={{ width: 50, textAlign: 'center' }}>条数</span>
                     </div>
                     <div className="export-history-list">
-                      {exportHistory.map((record) => (
-                        <div
-                          key={record.id}
-                          className={`export-history-item ${selectedExportId === record.id ? 'active' : ''}`}
-                          onClick={() => setSelectedExportId(record.id)}
-                        >
+                      {filteredExportHistory.map((record) => {
+                        const isSelected = selectedExportId === record.id;
+                        const isCompared = compareIds.includes(record.id);
+                        const statusInfo = record.status ? EXPORT_STATUS_LABELS[record.status] : null;
+                        return (
+                          <div
+                            key={record.id}
+                            className={`export-history-item ${isSelected ? 'active' : ''} ${isCompared ? 'compared' : ''}`}
+                            onClick={() => {
+                              if (compareMode) {
+                                toggleCompareId(record.id);
+                              } else {
+                                setSelectedExportId(record.id);
+                                setEditingStatus(false);
+                              }
+                            }}
+                          >
+                            {compareMode && (
+                              <div className="export-compare-checkbox">
+                                {isCompared ? <Check size={12} /> : null}
+                              </div>
+                            )}
                             <div className="export-history-main">
                               <div className="export-history-file">
                                 <FileDown
@@ -686,6 +852,18 @@ export default function AppHeader() {
                                   <div className="export-history-template">
                                     <Package size={10} />
                                     {record.templateName}
+                                    {statusInfo && (
+                                      <span
+                                        className="export-status-badge"
+                                        style={{
+                                          background: `${statusInfo.color}15`,
+                                          color: statusInfo.color,
+                                          borderColor: `${statusInfo.color}40`,
+                                        }}
+                                      >
+                                        {statusInfo.label}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -706,112 +884,347 @@ export default function AppHeader() {
                               </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="export-history-right">
-                  {selectedExport ? (
-                    <div className="export-preview">
-                      <div className="export-preview-header">
-                      <Eye size={14} />
-                      <span>内容摘要</span>
+                        );
+                      })}
                     </div>
-                      <div className="export-preview-content">
-                        <div className="export-detail-row">
-                          <span className="export-detail-label">文件路径</span>
-                          <div className="export-detail-value" title={selectedExport.path}>
-                            <Target size={11} />
-                            {selectedExport.path}
-                            <button
-                              className="btn btn-ghost btn-xs"
-                              onClick={() => copyToClipboard(selectedExport.path)}
-                              title="复制路径"
-                            >
-                              <Copy size={10} />
-                            </button>
+                  </>
+                )}
+              </div>
+
+              <div className="export-history-right">
+                {compareMode ? (
+                  compareRecords.length === 2 ? (
+                    <div className="export-compare-view">
+                      <div className="export-compare-header">
+                        <span className="export-compare-title">对比预览</span>
+                        <span className="export-compare-subtitle">
+                          {compareRecords[0].filename} ↔ {compareRecords[1].filename}
+                        </span>
+                      </div>
+                      <div className="export-compare-grid">
+                        <div className="export-compare-col">
+                          <div className="export-compare-col-header">
+                            <FileDown size={12} style={{ color: '#f59e0b' }} />
+                            <span title={compareRecords[0].filename}>
+                              {compareRecords[0].filename.length > 18
+                                ? compareRecords[0].filename.substring(0, 18) + '...'
+                                : compareRecords[0].filename}
+                            </span>
+                          </div>
+                          <div className="export-compare-col-body">
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">模板</span>
+                              <span className="export-compare-value">{compareRecords[0].templateName}</span>
+                            </div>
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">组合</span>
+                              <span className="export-compare-value">{compareRecords[0].portfolio || '全部'}</span>
+                            </div>
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">条目数</span>
+                              <span className="export-compare-value">
+                                {compareRecords[0].itemCount} 项
+                              </span>
+                            </div>
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">导出时间</span>
+                              <span className="export-compare-value">
+                                {formatDate(compareRecords[0].exportedAt, 'MM-DD HH:mm')}
+                              </span>
+                            </div>
+                            <div className="export-compare-section">
+                              <span className="export-compare-label">摘要</span>
+                              <div className="export-compare-summary">
+                                {compareRecords[0].summary || '无摘要'}
+                              </div>
+                            </div>
+                            {compareRecords[0].content && (
+                              <details className="export-preview-full">
+                                <summary>
+                                  <ChevronRight size={12} />
+                                  查看完整内容
+                                </summary>
+                                <pre className="export-preview-markdown">
+                                  {compareRecords[0].content}
+                                </pre>
+                              </details>
+                            )}
                           </div>
                         </div>
-                        <div className="export-detail-row">
-                          <span className="export-detail-label">导出模板</span>
-                          <span className="export-detail-value">
-                            {selectedExport.templateName}
-                          </span>
+
+                        <div className="export-compare-divider">
+                          <GitCompare size={14} style={{ color: 'var(--text-muted)' }} />
                         </div>
-                        <div className="export-detail-row">
-                          <span className="export-detail-label">所属组合</span>
-                          <span className="export-detail-value">
-                            {selectedExport.portfolio || '全部组合'}
-                          </span>
-                        </div>
-                        <div className="export-detail-row">
-                          <span className="export-detail-label">条目数量</span>
-                          <span className="export-detail-value">
-                            {selectedExport.itemCount} 项
-                          </span>
-                        </div>
-                        <div className="export-detail-row">
-                          <span className="export-detail-label">导出时间</span>
-                          <span className="export-detail-value">
-                            {formatDate(selectedExport.exportedAt, 'YYYY-MM-DD HH:mm:ss')}
-                          </span>
-                        </div>
-                        <div className="export-detail-section">
-                          <span className="export-detail-label">摘要预览</span>
-                          <div className="export-preview-summary">
-                            {selectedExport.summary || '无摘要'}
+
+                        <div className="export-compare-col">
+                          <div className="export-compare-col-header">
+                            <FileDown size={12} style={{ color: '#3b82f6' }} />
+                            <span title={compareRecords[1].filename}>
+                              {compareRecords[1].filename.length > 18
+                                ? compareRecords[1].filename.substring(0, 18) + '...'
+                                : compareRecords[1].filename}
+                            </span>
                           </div>
-                          {selectedExport.content && (
-                            <details className="export-preview-full">
-                              <summary>
-                                <ChevronRight size={12} />
-                                查看完整内容
-                              </summary>
-                              <pre className="export-preview-markdown">
-                                {selectedExport.content}
-                              </pre>
-                            </details>
-                          )}
-                        </div>
-                        <div className="export-preview-actions">
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => openFolder(selectedExport.path)}
-                          >
-                            <FolderOpen size={12} />
-                            打开文件位置
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => copyToClipboard(selectedExport.content || selectedExport.summary || '')}
-                          >
-                            <Copy size={12} />
-                            复制内容
-                          </button>
+                          <div className="export-compare-col-body">
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">模板</span>
+                              <span className="export-compare-value">{compareRecords[1].templateName}</span>
+                            </div>
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">组合</span>
+                              <span className="export-compare-value">{compareRecords[1].portfolio || '全部'}</span>
+                            </div>
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">条目数</span>
+                              <span className="export-compare-value">
+                                {compareRecords[1].itemCount} 项
+                                {compareRecords[1].itemCount !== compareRecords[0].itemCount && (
+                                  <span
+                                    className="export-compare-diff"
+                                    style={{
+                                      color: compareRecords[1].itemCount > compareRecords[0].itemCount
+                                        ? '#10b981'
+                                        : '#ef4444',
+                                    }}
+                                  >
+                                    ({compareRecords[1].itemCount > compareRecords[0].itemCount ? '+' : ''}
+                                    {compareRecords[1].itemCount - compareRecords[0].itemCount})
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="export-compare-row">
+                              <span className="export-compare-label">导出时间</span>
+                              <span className="export-compare-value">
+                                {formatDate(compareRecords[1].exportedAt, 'MM-DD HH:mm')}
+                              </span>
+                            </div>
+                            <div className="export-compare-section">
+                              <span className="export-compare-label">摘要</span>
+                              <div className="export-compare-summary">
+                                {compareRecords[1].summary || '无摘要'}
+                              </div>
+                            </div>
+                            {compareRecords[1].content && (
+                              <details className="export-preview-full">
+                                <summary>
+                                  <ChevronRight size={12} />
+                                  查看完整内容
+                                </summary>
+                                <pre className="export-preview-markdown">
+                                  {compareRecords[1].content}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                   ) : (
                     <div className="export-preview-empty">
-                      <FileText size={28} className="empty-state-icon" />
-                      <div className="empty-state-text">选择一条记录查看详情</div>
+                      <GitCompare size={28} className="empty-state-icon" />
+                      <div className="empty-state-text">请选择两条记录进行对比</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                        点击左侧列表中的导出记录
+                        已选择 {compareIds.length} / 2 条
                       </div>
                     </div>
-                  )}
-                </div>
+                  )
+                ) : selectedExport ? (
+                  <div className="export-preview">
+                    <div className="export-preview-header">
+                      <Eye size={14} />
+                      <span>详情与流转</span>
+                      {!editingStatus ? (
+                        <button
+                          className="btn btn-ghost btn-xs"
+                          onClick={() => startEditStatus(selectedExport)}
+                        >
+                          <Edit3 size={11} />
+                          编辑状态
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-primary btn-xs"
+                          onClick={saveStatusEdit}
+                        >
+                          <Save size={11} />
+                          保存
+                        </button>
+                      )}
+                    </div>
+                    <div className="export-preview-content">
+                      <div className="export-detail-row">
+                        <span className="export-detail-label">文件路径</span>
+                        <div className="export-detail-value" title={selectedExport.path}>
+                          <Target size={11} />
+                          {selectedExport.path}
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            onClick={() => copyToClipboard(selectedExport.path)}
+                            title="复制路径"
+                          >
+                            <Copy size={10} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="export-detail-row">
+                        <span className="export-detail-label">导出模板</span>
+                        <span className="export-detail-value">
+                          {selectedExport.templateName}
+                        </span>
+                      </div>
+                      <div className="export-detail-row">
+                        <span className="export-detail-label">所属组合</span>
+                        <span className="export-detail-value">
+                          {selectedExport.portfolio || '全部组合'}
+                        </span>
+                      </div>
+                      <div className="export-detail-row">
+                        <span className="export-detail-label">条目数量</span>
+                        <span className="export-detail-value">
+                          {selectedExport.itemCount} 项
+                        </span>
+                      </div>
+                      <div className="export-detail-row">
+                        <span className="export-detail-label">导出时间</span>
+                        <span className="export-detail-value">
+                          {formatDate(selectedExport.exportedAt, 'YYYY-MM-DD HH:mm:ss')}
+                        </span>
+                      </div>
+
+                      <div className="export-status-section">
+                        <span className="export-detail-label">流转状态</span>
+                        {editingStatus ? (
+                          <select
+                            className="filter-select"
+                            value={editStatus}
+                            onChange={(e) => setEditStatus(e.target.value as ExportStatus | '')}
+                          >
+                            <option value="">未设置</option>
+                            {(Object.keys(EXPORT_STATUS_LABELS) as ExportStatus[]).map((s) => (
+                              <option key={s} value={s}>
+                                {EXPORT_STATUS_LABELS[s].label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="export-detail-value">
+                            {selectedExport.status ? (
+                              <span
+                                className="export-status-badge large"
+                                style={{
+                                  background: `${EXPORT_STATUS_LABELS[selectedExport.status].color}15`,
+                                  color: EXPORT_STATUS_LABELS[selectedExport.status].color,
+                                  borderColor: `${EXPORT_STATUS_LABELS[selectedExport.status].color}40`,
+                                }}
+                              >
+                                {EXPORT_STATUS_LABELS[selectedExport.status].label}
+                              </span>
+                            ) : (
+                              '未设置'
+                            )}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="export-status-section">
+                        <span className="export-detail-label">
+                          <User size={10} />
+                          发给谁
+                        </span>
+                        {editingStatus ? (
+                          <input
+                            type="text"
+                            className="text-input"
+                            placeholder="如：基金经理、投研团队、客户..."
+                            value={editRecipient}
+                            onChange={(e) => setEditRecipient(e.target.value)}
+                          />
+                        ) : (
+                          <span className="export-detail-value">
+                            {selectedExport.recipient || '未填写'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="export-status-section">
+                        <span className="export-detail-label">
+                          <MessageSquare size={10} />
+                          备注
+                        </span>
+                        {editingStatus ? (
+                          <textarea
+                            className="text-input textarea"
+                            placeholder="记录这版材料的用途、补充说明..."
+                            value={editRemark}
+                            onChange={(e) => setEditRemark(e.target.value)}
+                          />
+                        ) : (
+                          <span className="export-detail-value remark">
+                            {selectedExport.remark || '无备注'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="export-detail-section">
+                        <span className="export-detail-label">摘要预览</span>
+                        <div className="export-preview-summary">
+                          {selectedExport.summary || '无摘要'}
+                        </div>
+                        {selectedExport.content && (
+                          <details className="export-preview-full">
+                            <summary>
+                              <ChevronRight size={12} />
+                              查看完整内容
+                            </summary>
+                            <pre className="export-preview-markdown">
+                              {selectedExport.content}
+                            </pre>
+                          </details>
+                        )}
+                      </div>
+
+                      <div className="export-preview-actions">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => openFolder(selectedExport.path)}
+                        >
+                          <FolderOpen size={12} />
+                          打开文件位置
+                        </button>
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => copyToClipboard(selectedExport.content || selectedExport.summary || '')}
+                        >
+                          <Copy size={12} />
+                          复制内容
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="export-preview-empty">
+                    <FileText size={28} className="empty-state-icon" />
+                    <div className="empty-state-text">选择一条记录查看详情</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      点击左侧列表中的导出记录
+                    </div>
+                  </div>
+                )}
               </div>
+            </div>
             {exportHistory.length > 0 && (
               <div className="modal-footer">
+                <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                  最多保留最近 20 条记录
+                </span>
                 <button
                   className="btn btn-danger btn-sm"
                   onClick={() => {
                     if (confirm('确定清空所有导出历史记录吗？')) {
                       clearExportHistory();
                       setSelectedExportId(null);
+                      setCompareIds([]);
                     }
                   }}
                 >

@@ -121,6 +121,9 @@ export default function OpinionPanel() {
         .filter((c) => c.portfolio === activePortfolio)
         .map((c) => c.id);
       filtered = filtered.filter((o) => portfolioCompanyIds.includes(o.companyId));
+      if (selectedCompanyId) {
+        filtered = filtered.filter((o) => o.companyId === selectedCompanyId);
+      }
     } else if (selectedCompanyId) {
       filtered = filtered.filter((o) => o.companyId === selectedCompanyId);
     }
@@ -141,9 +144,14 @@ export default function OpinionPanel() {
         .filter((c) => c.portfolio === activePortfolio)
         .map((c) => c.id);
       filtered = filtered.filter((o) => portfolioCompanyIds.includes(o.companyId));
+      if (selectedCompanyId) {
+        filtered = filtered.filter((o) => o.companyId === selectedCompanyId);
+      }
+    } else if (selectedCompanyId) {
+      filtered = filtered.filter((o) => o.companyId === selectedCompanyId);
     }
     return filtered;
-  }, [opinions, currentDate, isMorningFilter, activePortfolio, companies]);
+  }, [opinions, currentDate, isMorningFilter, activePortfolio, companies, selectedCompanyId]);
 
   const todayEventsWithConclusions = useMemo(() => {
     let todayEvents = events.filter(
@@ -154,6 +162,9 @@ export default function OpinionPanel() {
         .filter((c) => c.portfolio === activePortfolio)
         .map((c) => c.id);
       todayEvents = todayEvents.filter((e) => portfolioCompanyIds.includes(e.companyId));
+      if (selectedCompanyId) {
+        todayEvents = todayEvents.filter((e) => e.companyId === selectedCompanyId);
+      }
     } else if (selectedCompanyId) {
       todayEvents = todayEvents.filter((e) => e.companyId === selectedCompanyId);
     }
@@ -161,6 +172,24 @@ export default function OpinionPanel() {
       (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
     );
   }, [events, currentDate, isMorningFilter, activePortfolio, companies, selectedCompanyId]);
+
+  const allEventsWithConclusions = useMemo(() => {
+    let allEvents = events.filter((e) => e.conclusion);
+    if (isMorningFilter && activePortfolio) {
+      const portfolioCompanyIds = companies
+        .filter((c) => c.portfolio === activePortfolio)
+        .map((c) => c.id);
+      allEvents = allEvents.filter((e) => portfolioCompanyIds.includes(e.companyId));
+      if (selectedCompanyId) {
+        allEvents = allEvents.filter((e) => e.companyId === selectedCompanyId);
+      }
+    } else if (selectedCompanyId) {
+      allEvents = allEvents.filter((e) => e.companyId === selectedCompanyId);
+    }
+    return allEvents.sort(
+      (a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
+    );
+  }, [events, isMorningFilter, activePortfolio, companies, selectedCompanyId]);
 
   const groupedTracker = useMemo(() => {
     const baseDate = new Date();
@@ -170,7 +199,7 @@ export default function OpinionPanel() {
       later: [],
       unset: [],
     };
-    for (const ev of todayEventsWithConclusions) {
+    for (const ev of allEventsWithConclusions) {
       if (!ev.conclusion) continue;
       const company = companies.find((c) => c.id === ev.companyId);
       const item: GroupedFollowUp = {
@@ -191,7 +220,7 @@ export default function OpinionPanel() {
     groups.this_week.sort((a, b) => sortKey(a) - sortKey(b));
     groups.later.sort((a, b) => sortKey(a) - sortKey(b));
     return groups;
-  }, [todayEventsWithConclusions, companies]);
+  }, [allEventsWithConclusions, companies]);
 
   const getCompanyName = (companyId: string) => {
     return companies.find((c) => c.id === companyId)?.name || '未知';

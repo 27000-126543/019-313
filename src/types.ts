@@ -64,6 +64,15 @@ export interface Event {
 
 export type ExportType = 'morning' | 'close';
 
+export type ExportStatus = 'pending_send' | 'sent' | 'pending_supplement' | 'archived';
+
+export const EXPORT_STATUS_LABELS: Record<ExportStatus, { label: string; color: string }> = {
+  pending_send: { label: '待发送', color: '#f59e0b' },
+  sent: { label: '已发送', color: '#10b981' },
+  pending_supplement: { label: '待补充', color: '#ef4444' },
+  archived: { label: '已归档', color: '#6b7280' },
+};
+
 export interface ExportRecord {
   id: string;
   type: ExportType;
@@ -75,6 +84,9 @@ export interface ExportRecord {
   itemCount: number;
   summary?: string;
   content?: string;
+  status?: ExportStatus;
+  recipient?: string;
+  remark?: string;
 }
 
 export interface Opinion {

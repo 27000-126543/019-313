@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppData, Company, NewsItem, Event, Opinion, EventConclusion, ExportRecord, ExportType } from '../types';
+import type { AppData, Company, NewsItem, Event, Opinion, EventConclusion, ExportRecord, ExportType, ExportStatus } from '../types';
 
 export type MorningFilterMode =
   | 'off'
@@ -43,6 +43,7 @@ interface StoreState extends AppData {
   updateOpinion: (opinion: Opinion) => void;
   deleteOpinion: (id: string) => void;
   addExportRecord: (record: Omit<ExportRecord, 'id'>) => void;
+  updateExportRecord: (id: string, updates: Partial<ExportRecord>) => void;
   clearExportHistory: () => void;
   loadData: (data: AppData) => void;
   getExportData: () => AppData;
@@ -202,6 +203,12 @@ export const useStore = create<StoreState>((set, get) => ({
         { ...record, id: `exp_${Date.now()}` },
         ...s.exportHistory,
       ].slice(0, 20),
+    })),
+  updateExportRecord: (id, updates) =>
+    set((s) => ({
+      exportHistory: s.exportHistory.map((r) =>
+        r.id === id ? { ...r, ...updates } : r
+      ),
     })),
   clearExportHistory: () => set({ exportHistory: [] }),
 
