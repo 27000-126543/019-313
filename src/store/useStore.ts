@@ -1,5 +1,13 @@
 import { create } from 'zustand';
-import type { AppData, Company, NewsItem, Event, Opinion } from '../types';
+import type { AppData, Company, NewsItem, Event, Opinion, EventConclusion } from '../types';
+
+export type MorningFilterMode =
+  | 'off'
+  | 'all'
+  | 'core_portfolio'
+  | 'negative_sentiment'
+  | 'need_verify'
+  | 'risk_warning';
 
 interface StoreState extends AppData {
   selectedCompanyId: string | null;
@@ -10,6 +18,7 @@ interface StoreState extends AppData {
   filterIndustry: string | null;
   filterImportance: string | null;
   isMorningFilter: boolean;
+  morningFilterMode: MorningFilterMode;
   setSelectedCompany: (id: string | null) => void;
   setSelectedEvent: (id: string | null) => void;
   setSelectedNews: (id: string | null) => void;
@@ -17,6 +26,7 @@ interface StoreState extends AppData {
   setFilterPortfolio: (filter: string | null) => void;
   setFilterIndustry: (filter: string | null) => void;
   setFilterImportance: (filter: string | null) => void;
+  setMorningFilterMode: (mode: MorningFilterMode) => void;
   toggleMorningFilter: () => void;
   addCompany: (company: Company) => void;
   updateCompany: (company: Company) => void;
@@ -24,8 +34,10 @@ interface StoreState extends AppData {
   addNews: (news: NewsItem) => void;
   updateNews: (news: NewsItem) => void;
   mergeNewsToEvent: (newsIds: string[], eventTitle: string, companyId: string) => void;
+  addNewsToEvent: (newsId: string, eventId: string) => void;
   addEvent: (event: Event) => void;
   updateEvent: (event: Event) => void;
+  updateEventConclusion: (eventId: string, conclusion: EventConclusion) => void;
   addOpinion: (opinion: Opinion) => void;
   updateOpinion: (opinion: Opinion) => void;
   deleteOpinion: (id: string) => void;
@@ -50,6 +62,7 @@ export const useStore = create<StoreState>((set, get) => ({
   filterIndustry: null,
   filterImportance: null,
   isMorningFilter: false,
+  morningFilterMode: 'all',
 
   setSelectedCompany: (id) => set({ selectedCompanyId: id, selectedEventId: null, selectedNewsId: null }),
   setSelectedEvent: (id) => set({ selectedEventId: id, selectedNewsId: null }),
@@ -58,7 +71,16 @@ export const useStore = create<StoreState>((set, get) => ({
   setFilterPortfolio: (filter) => set({ filterPortfolio: filter }),
   setFilterIndustry: (filter) => set({ filterIndustry: filter }),
   setFilterImportance: (filter) => set({ filterImportance: filter }),
-  toggleMorningFilter: () => set((s) => ({ isMorningFilter: !s.isMorningFilter })),
+  setMorningFilterMode: (mode) =>
+    set({
+      morningFilterMode: mode,
+      isMorningFilter: mode !== 'off',
+    }),
+  toggleMorningFilter: () =>
+    set((s) => ({
+      isMorningFilter: !s.isMorningFilter,
+      morningFilterMode: s.isMorningFilter ? 'off' : 'all',
+    })),
 
   addCompany: (company) => set((s) => ({ companies: [...s.companies, company] })),
   updateCompany: (company) =>
@@ -88,15 +110,6 @@ export const useStore = create<StoreState>((set, get) => ({
       : sentiments.includes('positive')
       ? 'positive'
       : 'neutral';
-    const importances = relatedNews
-      .flatMap((n) =>
-        state.events.filter((e) => n.eventId === e.id).map((e) => e.importance)
-      ) as Array<'high' | 'medium' | 'low'>;
-    const importance = importances.includes('high')
-      ? 'high'
-      : importances.includes('medium')
-      ? 'medium'
-      : 'low';
 
     const newEvent: Event = {
       id: eventId,
@@ -107,7 +120,7 @@ export const useStore = create<StoreState>((set, get) => ({
       endTime: new Date(Math.max(...relatedNews.map((n) => new Date(n.publishTime).getTime()))).toISOString(),
       sentiment,
       tags: [...new Set(relatedNews.flatMap((n) => n.tags))],
-      importance,
+      importance: 'medium',
       createdAt: new Date().toISOString(),
     };
 
@@ -118,14 +131,46 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
   },
 
+  addNewsToEvent: (newsId, eventId) => {
+    const state = get();
+    const newsItem = state.news.find((n) => n.id === newsId);
+    const event = state.events.find((e) => e.id === eventId);
+    if (!newsItem || !event) return;
+    if (newsItem.companyId !== event.companyId) return;
+
+    const newNewsIds = event.newsIds.includes(newsId) ? event.newsIds : [...event.newsIds, newsId];
+    const relatedNews = state.news.filter((n) => newNewsIds.includes(n.id));
+
+    set((s) => ({
+      events: s.events.map((e) =>
+        e.id === eventId
+          ? {
+              ...e,
+              newsIds: newNewsIds,
+              endTime: new Date(
+                Math.max(...relatedNews.map((n) => new Date(n.publishTime).getTime()))
+              ).toISOString(),
+            }
+          : e
+      ),
+      news: s.news.map((n) => (n.id === newsId ? { ...n, eventId } : n)),
+    }));
+  },
+
   addEvent: (event) => set((s) => ({ events: [...s.events, event] })),
   updateEvent: (event) =>
     set((s) => ({ events: s.events.map((e) => (e.id === event.id ? event : e)) })),
+  updateEventConclusion: (eventId, conclusion) =>
+    set((s) => ({
+      events: s.events.map((e) => (e.id === eventId ? { ...e, conclusion } : e)),
+    })),
 
   addOpinion: (opinion) => set((s) => ({ opinions: [...s.opinions, opinion] })),
   updateOpinion: (opinion) =>
     set((s) => ({
-      opinions: s.opinions.map((o) => (o.id === opinion.id ? { ...opinion, updatedAt: new Date().toISOString() } : o)),
+      opinions: s.opinions.map((o) =>
+        o.id === opinion.id ? { ...opinion, updatedAt: new Date().toISOString() } : o
+      ),
     })),
   deleteOpinion: (id) => set((s) => ({ opinions: s.opinions.filter((o) => o.id !== id) })),
 

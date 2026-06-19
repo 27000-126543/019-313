@@ -108,6 +108,7 @@ export const mockNews: NewsItem[] = [
     confidence: 0.85,
     tags: ['批价', '库存', '渠道'],
     watchItemType: 'price_fluctuation',
+    eventId: 'event_001',
   },
   {
     id: 'news_002',
@@ -134,6 +135,7 @@ export const mockNews: NewsItem[] = [
     confidence: 0.88,
     tags: ['批价', '二级市场'],
     watchItemType: 'price_fluctuation',
+    eventId: 'event_001',
   },
   {
     id: 'news_004',
@@ -265,6 +267,11 @@ export const mockEvents: Event[] = [
     sentiment: 'negative',
     tags: ['批价', '库存'],
     importance: 'high',
+    conclusion: {
+      coreJudgment: '批价短期波动属春节后季节性调整，不改全年量价规划，渠道去库压力可控',
+      impactScope: '短期压制板块情绪，经销商打款节奏或受影响，建议关注3月糖酒会政策口径',
+      followUpTime: '2026-03-20（糖酒会前后）',
+    },
     createdAt: formatTime(14, 30),
   },
 ];

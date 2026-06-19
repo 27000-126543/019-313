@@ -42,6 +42,12 @@ export interface NewsItem {
   eventId?: string;
 }
 
+export interface EventConclusion {
+  coreJudgment: string;
+  impactScope: string;
+  followUpTime: string;
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -52,6 +58,7 @@ export interface Event {
   sentiment: 'positive' | 'negative' | 'neutral';
   tags: string[];
   importance: 'high' | 'medium' | 'low';
+  conclusion?: EventConclusion;
   createdAt: string;
 }
 

@@ -24,6 +24,7 @@ export default function PortfolioPanel() {
   const setFilterPortfolio = useStore((s) => s.setFilterPortfolio);
   const setFilterIndustry = useStore((s) => s.setFilterIndustry);
   const isMorningFilter = useStore((s) => s.isMorningFilter);
+  const morningFilterMode = useStore((s) => s.morningFilterMode);
 
   const [groupBy, setGroupBy] = useState<'portfolio' | 'industry'>('portfolio');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['核心持仓', '成长赛道', '价值蓝筹']));
@@ -136,8 +137,28 @@ export default function PortfolioPanel() {
 
   const isCompanyRelevant = (companyId: string) => {
     if (!isMorningFilter) return true;
+    const company = companies.find((c) => c.id === companyId);
+    if (!company) return false;
     const stats = getCompanyStats(companyId);
-    return stats.hasHighImportance || stats.importantOpinionCount > 0 || stats.sentimentCounts.negative > 0;
+
+    switch (morningFilterMode) {
+      case 'all':
+        return stats.hasHighImportance || stats.importantOpinionCount > 0 || stats.sentimentCounts.negative > 0;
+      case 'core_portfolio':
+        return company.portfolio === '核心持仓';
+      case 'negative_sentiment':
+        return stats.sentimentCounts.negative > 0 || stats.eventCount > 0 && events.some((e) => e.companyId === companyId && e.sentiment === 'negative');
+      case 'need_verify':
+      case 'risk_warning': {
+        const type = morningFilterMode;
+        const hasMatchOpinion = opinions.some(
+          (o) => o.companyId === companyId && o.type === type && formatDate(o.createdAt) === currentDate
+        );
+        return hasMatchOpinion;
+      }
+      default:
+        return true;
+    }
   };
 
   return (
